@@ -1,0 +1,480 @@
+---
+title: "Revisiting the Gapminder dataset using dplyr and ggplot2"
+author: "Minh Trung DANG"
+date: "14/01/2021"
+output: html_document
+---
+
+
+A selection of world health and economics statistics from the Gapminder project can be found in the dslabs package as data(gapminder).
+
+This post demonstrates the use of tidyverse package to explore the data set. 
+In addition, ggplot2 will support the exploration. 
+(Note): This post will use a very basic ggplot)
+
+
+GapMinder_Unfiltered is the dataset which has gdpPerCapita (Gross Domestic Product per Capita) across the countries in the globe collected over years dating 1950 to 2007
+Following are the variables in the dataset:
+1. Country : Names of the countries
+2. Continent : Name of the continent the country belongs to
+3. Year : year for which this observation is collected
+4. LifeExp : Life Expectency for people in that country
+5. Pop : Population for that country in that year
+6. gdpPerCap : It is the gdp Per capita ( gross domestic product divided by the population)
+
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(scales)
+library(gapminder)
+library(Hmisc)
+# this package contains the data
+```
+
+```{r}
+df <- gapminder
+```
+
+
+
+
+
+
+
+
+
+# 1. Smell-testing dataset
+There are many funcions that can be used such as: str(), summary(), head(), tail()...
+
+```{r}
+str(df)
+```
+There are six variables:
+** country	
+** continent	
+** year	
+** lifeExp: life expectancy at birth
+** pop: Total population
+** gdpPercap: The gross domestic product (GDP) per capita
+
+```{r}
+head(df)
+```
+
+```{r}
+summary(gapminder)
+```
+The data (life expectency, population, and per-capita GDP) were recorded from 1952 to 2007.
+
+# 2. Counting 
+For categorical variables such as country, continent, year, we can count the unique values. (Note: In this example, the variable year will be treated as categorical variable) 
+
+**Question 1:  How many countries, continents, and reported years are there in this data ?**
+
+```{r}
+df %>% 
+  summarise(nb_country = n_distinct(country),
+            nb_continent = n_distinct(continent),
+            nb_year= n_distinct(year))
+```
+
+There are only 12 unique years. We can see the earliest year is 1952, and it seems that the data are recorded every five years.
+There are five continents: Africa, Americas, Asia, Europe, Oceania.
+
+# 3 Ranking
+
+```{r, fig.width= 10, fig.height= 7.5}
+df%>% filter(year == 2007 & continent == "Americas") %>% 
+  arrange(gdpPercap) %>% 
+  mutate(country = factor(country, levels = country)) %>% 
+  ggplot(aes(x = gdpPercap, y = country)) +
+  geom_segment(aes(x = 0, xend = gdpPercap, 
+                   y = country, yend = country), 
+               colour = "purple") + 
+  geom_point(colour = "blue", size = 5, alpha = 0.8) +
+  scale_x_continuous(expand = c(0, 0), 
+                     limits = c(0, max(df$gdpPercap) * 1.1),
+                     labels = scales::dollar) +
+  labs(title = "",
+       subtitle = "GDP per capita in American countries, 2007",
+       x = NULL, 
+       y = NULL, 
+       fill = NULL) +
+  theme(panel.grid.major = element_blank(),
+        axis.text.y = element_text(hjust = 0))
+```
+
+# 4. Select the top N values by group (Finding the highest/smallest values)
+
+**Question 2: Top 10 countries with the highest life expectancy/the lowest life expectancy (for a specific year)**
+Similar question: The top most populated countries (for a specific year)
+
+```{r}
+df %>%
+  filter(year == 2007) %>%   
+  select(continent,country, lifeExp) %>%
+  arrange(desc(lifeExp)) %>% 
+  head(10)
+```
+
+Similarly, we can find the 10 countries with the lowest life expectency.
+
+```{r}
+df %>%
+  filter(year == 2007) %>%   
+  select(continent, country, lifeExp) %>%
+  arrange(lifeExp) %>% 
+  head(10)
+```
+It appears that African countries have the lowest life expectancy. 
+
+
+**Question 3: Top 10 GDP per capita in the world (in 2007)**
+
+```{r}
+df %>% 
+  filter(year == 2007) %>%   
+  select(continent,country, gdpPercap) %>%
+  arrange(desc(gdpPercap)) %>% 
+  head(10) 
+```
+
+Five european countries appear in the list of highest Per-capita GDP. No country comes from Africa.
+
+
+**Question 4: For each continent, what are the top 3 countries with hisghest GDP**
+
+```{r}
+df %>% 
+  filter(year == 1997 & continent != "Oceania") %>%   
+  select(continent, country, gdpPercap, pop, lifeExp) %>%
+  group_by(continent) %>%
+  arrange(continent,desc(gdpPercap)) %>% 
+  top_n(3, gdpPercap)
+```
+
+We can see that the gross domestic product (GDP) per capita for the top African countries are still less than those of other continents.We can see clearly that gdpperCap of African countries are less than 10000. 
+
+
+# 4.Basic statistics: mean, median, max, min... 
+
+To compute some basic statistics for each continent.
+
+```{r}
+df%>%
+  filter(year == 2007 & continent != "Oceania") %>%
+  group_by(continent) %>%
+  summarise(med = median(lifeExp),
+            avg = mean(lifeExp),
+            min = min(lifeExp),
+            max = max(lifeExp))
+```
+
+There are many ways to visualize the distribution of numeric variables.
+We can also see the difference in life expectancy, population, and GDP per cap between continents.
+
+```{r}
+df%>%
+  filter(year == 2007 & continent != "Oceania") %>%
+  group_by(continent) %>%
+  ggplot(aes(x = continent, y = lifeExp)) +
+  geom_boxplot(outlier.colour = "red") +
+  geom_jitter(position = position_jitter(width = 0.1, height = 0), 
+              alpha = 0.75)
+```
+
+Looking at the distribution of varibables
+
+```{r}
+library(gridExtra)
+```
+
+```{r, fig.height= 5.0, fig.width= 12}
+p1 <- df %>% 
+  filter(year == 2007 & continent != "Oceania") %>%
+  ggplot(aes(x = lifeExp, fill = continent)) +
+  geom_histogram(binwidth=1, alpha=.5, position="identity")
+
+p2 <- df %>% 
+  filter(year == 2007 & continent != "Oceania") %>%
+  ggplot(aes(x = lifeExp, fill = continent)) +
+  geom_density(alpha=.5, position="identity") 
+
+grid.arrange(p1, p2, ncol=2)
+
+```
+
+```{r}
+library(ggridges)
+```
+
+```{r}
+df %>% filter(year == 2007 & continent != "Oceania") %>% 
+  ggplot(aes(x = lifeExp, y = fct_rev(continent), fill = continent)) +
+  geom_density_ridges(colour = "#bdbdbd", size = 0.8, alpha = 0.7) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_discrete(expand = c(0,0)) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Life expectancy distribution, 2007",
+       x = "Life Expectancy (years)",
+       y = "") +
+  theme(panel.grid.major.x = element_blank(),
+        legend.position = "none")
+```
+
+# 5.  Loooking at the relationship betwenn
+
+**Question 5. Are there relationship between life expectancy and gdppercap ?**
+
+```{r}
+df %>% 
+  filter(year == 2007 & continent != "Oceania") %>% 
+  ggplot(aes(x = gdpPercap,
+             y = lifeExp,
+             col = continent)) +
+  geom_point(alpha = 0.5)  + 
+  facet_wrap(~continent)
+```
+
+Taking a closer look for Africa
+
+```{r}
+df %>% 
+  filter(year == 2007 & continent == "Africa") %>% 
+  ggplot(aes(x = gdpPercap,
+             y = lifeExp)) +
+  geom_point(alpha = 0.80, size = 4, col = "blue") +
+  theme(legend.title = element_blank())
+```
+
+**Question 6.Are there any relationship between population and GDP?**
+
+```{r}
+library(ggpubr)
+```
+
+```{r}
+pop_gdp_asia <- df %>% 
+  filter(year == 2007 & continent == "Asia") %>% 
+  ggplot(aes(x = pop,
+             y = gdpPercap)) +
+  geom_point(color = "blue", size =2) +
+  labs(title = "Asia")
+  
+
+pop_gdp_americas <- df %>% 
+  filter(year == 2007 & continent == "Americas") %>% 
+  ggplot(aes(x = pop,
+             y = gdpPercap)) +
+  geom_point(color = "red", size =2)+
+  labs(title = "Americas")
+
+pop_gdp_europe <- df %>% 
+  filter(year == 2007 & continent == "Europe") %>% 
+  ggplot(aes(x = pop,
+             y = gdpPercap)) +
+  geom_point(color = "purple", size =2) +
+  labs(title = "Europe") 
+
+
+pop_gdp_africas <- df %>% 
+  filter(year == 2007 & continent == "Africa") %>% 
+  ggplot(aes(x = pop,
+             y = gdpPercap)) +
+  geom_point(color = "darkgreen", size =2) +
+  labs(title = "Africa")
+
+
+ggarrange(pop_gdp_asia, pop_gdp_americas,pop_gdp_europe,pop_gdp_africas)
+```
+
+
+**Question 7. Can we visualize the relationship between three avariables, including life expectancy, population, and gdp per capita?**
+
+```{r, fig.height= 7.5, fig.width=10}
+df %>% 
+  filter(year == 2007 & continent != "Oceania") %>% 
+  ggplot(aes(x=gdpPercap, y=lifeExp, size = pop, color=continent)) +
+  geom_point(alpha=0.7) +
+  scale_size(range = c(.5, 24), name="Population (M)")
+```
+
+**Question 8: The average life expectency after from 1957 to 1997, for different continents**
+
+```{r, fig.width= 10}
+p3 <- df %>%
+  filter(year%in% c("1952", "1997")) %>%
+  group_by(continent,year) %>% 
+  mutate(Avg_life_expectancy = mean(lifeExp),
+         Year = factor(year)) %>% 
+  ggplot() +
+  ylim(0,80) +
+  geom_line(aes(x = Year,
+             y = Avg_life_expectancy,
+             group = continent), 
+            size = 1.5,
+            color = "grey") +
+  geom_point(aes(x = Year,
+             y = Avg_life_expectancy,
+             color = continent),
+             size = 2) +
+  ylim(0,80) +
+  theme(legend.position = "none") + theme_minimal()
+  
+
+p4 <- df %>%
+  group_by(continent,year) %>% 
+  mutate(Avg_life_expectancy = mean(lifeExp),
+         Year = factor(year)) %>% 
+  ggplot() + 
+  ylim(0,80) +
+  geom_line(aes(x = Year,
+                y = Avg_life_expectancy,
+                group = continent), 
+            size = 1,
+            color = "grey") +
+  geom_point(aes(x = Year,
+                 y = Avg_life_expectancy,
+                 color = continent),
+             size = 2) + theme_minimal()
+
+ggarrange(p3, p4, widths = c(4,10))
+```
+
+
+The important improvement was observed for Asia and Americas.
+
+We can also look at the change in details.
+**Question 9: What countries in America have the biggest change in life expectancy?**
+
+```{r, fig.height= 7.5, fig.width=10}
+gapminder %>%
+  filter(year >= 2002, continent == "Americas") %>% 
+  mutate(Year = factor(year)) %>% 
+  ggplot(aes(y = reorder(country, lifeExp),
+           x = lifeExp)) +
+  geom_line(aes(group = country), 
+            size = 1.5, 
+            color = "grey") +
+  geom_point(aes(color = Year),
+             size = 4) +
+  scale_color_manual(values=c("red", "blue")) +
+  labs(x = "Life Expectancy (years)", y = NULL) +
+  theme(text = element_text(size = 16), 
+        panel.border = element_rect(fill = NA, colour = "grey20")) +
+  theme_minimal()
+```
+
+**Question 10. What countries have grown the most over the last 10 years?**
+
+```{r}
+top10_countries <- df %>% 
+  select(continent,year, country, gdpPercap) %>%
+  filter(year %in% c("1997", "2007"))%>%
+  pivot_wider(names_from=year, values_from = gdpPercap) %>% 
+  mutate(gdp_difference = `2007` - `1997`) %>% 
+  top_n(10,gdp_difference)
+
+top10_countries 
+```
+
+```{r}
+top_countries <- top10_countries$country
+
+df %>% filter(country %in% top_countries) %>% 
+  ggplot(aes(x = year, 
+             y = gdpPercap, 
+             col = country))+
+  geom_line(size = 1) 
+```
+
+
+As there are only two countries in Oceania: Australia and New Zealand, we will look at Oceania. 
+How did the life expectancy of these two countries change over the years?
+
+```{r}
+df %>% 
+  filter(continent == "Oceania") %>% 
+  ggplot(aes(x = year,y = gdpPercap, color = country)) +
+  geom_line( size = 1.0)+
+  scale_colour_manual(values = c("Australia" = "blue", "New Zealand" = "red")) +
+  ggtitle("GDP per Capita in Oceania from 1952 to 1997")
+```
+
+```{r}
+library(ggrepel)
+```
+
+
+**Question 11. In Europe, which countries have GDP above the median (in 2007) ?**
+
+```{r}
+df %>%
+  filter(year == 2007 & continent == "Europe") %>%
+  mutate(median = median(gdpPercap),
+         diff = gdpPercap - median,
+         type = ifelse(gdpPercap < median, "Below", "Above")) %>% 
+  arrange(diff) %>% 
+  mutate(country = factor(country, levels = country)) %>% 
+  ggplot(aes(x = country, y = diff, label = country)) + 
+  geom_col(aes(fill = type), width = 0.5, alpha = 0.8)  +
+  scale_y_continuous(expand = c(0, 0), 
+                     labels = scales::dollar) +
+  scale_fill_manual(labels = c("Above median", "Below median"),
+                    values = c("Above" = "purple", "Below" = "blue")) + 
+  labs(title =  "GDP per capita, 2007",
+       x = NULL,
+       y = NULL,
+       fill = NULL) + 
+  coord_flip() +
+  theme(panel.grid.major.y = element_blank())
+
+```
+
+```{r}
+library(treemapify)
+```
+
+```{r, fig.width= 10, fig.height= 7.5}
+df%>% filter(year == 2007 & continent != "Oceania") %>%
+  mutate(gdp = pop * gdpPercap) %>% 
+  ggplot(aes(area = gdp, fill = continent, subgroup = continent, label = country)) +
+  geom_treemap() +
+  geom_treemap_subgroup_border(colour = "black") +
+  geom_treemap_subgroup_text(fontface = "bold", colour = "#f0f0f0", alpha = 0.7, place = "bottomleft") +
+  geom_treemap_text(colour = "white", place = "centre", reflow = TRUE) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "Country GDP by continent, 2007",
+       x = NULL, 
+       y = NULL, 
+       fill = NULL) +
+  theme(legend.position = "none")
+```
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

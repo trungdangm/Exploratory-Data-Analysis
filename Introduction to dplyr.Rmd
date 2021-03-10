@@ -1,0 +1,325 @@
+---
+title: "Introduction to dplyr"
+author: "Minh Trung DANG"
+date: "16/01/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(tidyverse)
+```
+
+
+
+```{r}
+library(gapminder)
+```
+
+```{r}
+summary(gapminder)
+```
+
+6.3 Use filter() to subset data row-wise
+filter() takes logical expressions and returns the rows for which all are TRUE.
+
+```{r}
+filter(gapminder, lifeExp < 29)
+```
+
+
+```{r}
+filter(gapminder, country == "Rwanda", year > 1979)
+```
+
+
+```{r}
+gapminder %>% 
+  filter(country == "Canada" & year > 1979)
+```
+
+
+```{r}
+gapminder %>% 
+  filter(country %in% c("Canada","Cambodia") & year > 1979)
+```
+
+
+```{r}
+gapminder %>% 
+  filter(country %in% c("Canada","Cambodiam") & year %in% c(2002, 2007))
+```
+
+
+
+6.5 Use select() to subset the data on variables or columns.
+
+
+```{r}
+gapminder %>% 
+  select(country, year, gdpPercap) %>% 
+  filter(country == c("Canada","Cambodia") & year > 1979)
+```
+
+Use mutate() to add new variables
+
+```{r}
+df <- gapminder
+```
+
+
+```{r}
+df %>% 
+  select(country, year, pop, gdpPercap) %>% 
+  filter(country == c("Canada","England") & year > 1979) %>% 
+  mutate(gdp = pop*gdpPercap)
+```
+
+
+7.5 Use arrange() to row-order data in a principled way
+
+arrange() reorders the rows in a data frame. Imagine you wanted this data ordered by year then country, as opposed to by country then year.
+
+
+```{r}
+df %>% 
+  select(country, year,lifeExp) %>% 
+  filter(country == "Cambodia") %>% 
+  arrange(lifeExp)
+```
+
+```{r}
+df %>% 
+  select(country, year,lifeExp) %>% 
+  filter(country == "Cambodia") %>% 
+  arrange(-year)
+```
+
+```{r}
+df %>% 
+  select(country, year,lifeExp) %>% 
+  filter(country == "Cambodia") %>% 
+  arrange(year, lifeExp)
+```
+
+
+
+select() can rename and reposition variables
+
+```{r}
+df %>%
+  filter(country == "Canada", year > 1996) %>% 
+  select(yr = year, lifeExp, gdpPercap) %>% 
+  select(gdpPercap, everything())
+```
+
+
+7.8 group_by()
+
+
+COUNTING 
+
+```{r}
+df %>%
+  group_by(continent) %>%
+  summarize(n = n())
+```
+
+```{r}
+df %>%
+  group_by(continent) %>%
+  tally()
+```
+
+
+
+```{r}
+table(df$continent)
+```
+
+
+```{r}
+df %>% 
+  count(continent)
+```
+
+
+```{r}
+df %>% 
+  summarise(freq = n_distinct(country))
+```
+
+```{r}
+df %>% 
+  group_by(continent) %>% 
+  summarise(total = n(),
+            dist_country = n_distinct(country))
+```
+
+7.8.2 General summarization
+
+```{r}
+df %>%
+  filter(continent == "Americas") %>% 
+  group_by(country) %>%
+  summarize(avg_lifeExp = mean(lifeExp)) %>% 
+  arrange(desc(avg_lifeExp))
+```
+
+
+```{r}
+df %>%
+  filter(continent == "Americas") %>% 
+  group_by(country) %>%
+  summarize(avg_lifeExp = mean(lifeExp),
+            ave_pop = mean(pop)) %>% 
+  arrange(desc(avg_lifeExp))
+```
+
+
+```{r}
+df %>%
+  filter(continent == "Americas") %>% 
+  group_by(country) %>%
+  summarize(avg_lifeExp = mean(lifeExp),
+            med_lifeExp = median(lifeExp),
+            ave_pop = mean(pop),
+            med_pop = median(pop))
+```
+
+
+```{r}
+df %>%
+  filter(continent == "Americas") %>% 
+  group_by(country) %>%
+  summarize_at(vars(lifeExp, gdpPercap), 
+               list(~mean(.), ~median(.)))
+```
+
+
+```{r}
+df %>%
+  filter(continent == "Asia") %>%
+  group_by(year) %>%
+  summarize(min_lifeExp = min(lifeExp), max_lifeExp = max(lifeExp))
+```
+Computing with group-wise summaries
+
+Let’s make a new variable that is the years of life expectancy gained (lost) relative to 1952, for each individual country. We group by country and use mutate() to make a new variable. The first() function extracts the first value from a vector. Notice that first() is operating on the vector of life expectancies within each country group.
+
+```{r}
+df %>% 
+  filter(continent == "Asia" & year < 1970) %>% 
+  group_by(country) %>% 
+  select(country, year, lifeExp) %>% 
+  mutate(lifeExp_gain = lifeExp - first(lifeExp))
+```
+
+
+```{r}
+df %>% 
+  filter(continent == "Asia" & year < 1970) %>% 
+  group_by(country) %>% 
+  select(country, year, pop) %>% 
+  mutate(pop_increase = pop - first(pop))
+```
+
+
+
+```{r, fig.height= 10, fig.width= 20}
+df %>% 
+  filter(continent == "Asia" & year > 1990) %>% 
+  group_by(country) %>% 
+  select(country, year, pop) %>% 
+  mutate(pop_increase = pop - first(pop)) %>% 
+  ggplot()+
+  geom_line(aes(x = year, y =  pop_increase, color = country), size =1.5) +
+  theme(legend.position="bottom")
+```
+Within country, we take the difference between life expectancy in year  i
+  and life expectancy in 1952. Therefore we always see zeroes for 1952 and, for most countries, a sequence of positive and increasing numbers.
+
+
+Window functions
+
+Window functions take  n inputs and give back n outputs
+
+
+
+```{r}
+
+df %>%
+  filter(continent == "Asia") %>%
+  select(year, country, lifeExp) %>%
+  group_by(year) %>%
+  filter(min_rank(desc(lifeExp)) < 2 | min_rank(lifeExp) < 2) %>% 
+  arrange(year) %>%
+  print(n = Inf)
+```
+
+
+```{r}
+df %>% 
+  filter(continent =="Asia") %>% 
+  group_by(year) %>% 
+  mutate(rank_lifeExp = rank(desc(lifeExp))) %>% 
+  select(year, country, lifeExp, rank_lifeExp)
+```
+
+
+```{r, fig.height= 10}
+df %>% 
+  filter(continent =="Asia") %>% 
+  group_by(year) %>% 
+  mutate(rank_lifeExp = rank(desc(lifeExp))) %>%
+  select(year, country, lifeExp, rank_lifeExp) %>% 
+  ggplot(aes(x = year, y = rank_lifeExp, color = country))+
+  geom_point(size =  5) +
+  geom_line(size =  1,linetype = "dashed")+
+  theme(legend.position="bottom")
+```
+
+which country experienced the sharpest 5-year drop in life expectancy? Recall that this excerpt of the Gapminder data only has data every five years, e.g. for 1952, 1957, etc. So this really means looking at life expectancy changes between adjacent timepoints.
+
+```{r}
+df %>%
+  select(country, year, continent, lifeExp) %>%
+  group_by(continent, country) %>%
+  ## within country, take (lifeExp in year i) - (lifeExp in year i - 1)
+  ## positive means lifeExp went up, negative means it went down
+  mutate(le_delta = lifeExp - lag(lifeExp)) %>% 
+  ## within country, retain the worst lifeExp change = smallest or most negative
+  summarize(worst_le_delta = min(le_delta, na.rm = TRUE)) %>% 
+  ## within continent, retain the row with the lowest worst_le_delta
+  top_n(-1, wt = worst_le_delta) %>% 
+  arrange(worst_le_delta)
+```
+
+
+
+Average GDP/cap in each continent when the data was first and last collected (easy)
+Trimmed mean statistics for life expectancy in each continent for every year (fun)
+Absolute and relative world population in each of the continents (very fun)
+A list of all countries that at some point had their population size decrease (very fun)
+
+
+
+
+
+
+
+
+
+
+
+
+
